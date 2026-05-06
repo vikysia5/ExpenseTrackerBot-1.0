@@ -3,6 +3,7 @@ API Routers - REST endpoints
 OpenAPI 3.0 compliant
 """
 from typing import Optional
+from src.core.config import settings  # вот так
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from src.core.security import get_current_user, verify_telegram_init_data
 from src.models.schemas import (
@@ -35,10 +36,23 @@ async def login(body: UserLogin):
         raise HTTPException(status_code=401, detail=str(e))
 
 
-@auth_router.post("/telegram")
+'''@auth_router.post("/telegram")
 async def telegram_auth(body: TelegramAuth):
     telegram_data = verify_telegram_init_data(body.init_data)
-    return await auth_service.telegram_login(telegram_data)
+    return await auth_service.telegram_login(telegram_data)'''
+
+@auth_router.post("/auth/telegram")
+async def telegram_auth(data: TelegramAuth):
+    try:
+        user_data = verify_telegram_init_data(
+            data.init_data, 
+            settings.TELEGRAM_BOT_TOKEN
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=f"Telegram auth failed: {e}")
+    
+    user = await auth_service.telegram_login(user_data)
+    return user
 
 
 @auth_router.get("/me")

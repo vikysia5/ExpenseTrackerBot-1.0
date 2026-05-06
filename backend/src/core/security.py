@@ -12,6 +12,8 @@ from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.core.config import settings
 from src.core.logger import logger
+from urllib.parse import unquote, parse_qsl
+from time import time
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
@@ -40,24 +42,47 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-def verify_telegram_init_data(init_data: str) -> dict:
-    """Verify Telegram WebApp initData"""
-    try:
-        parsed = dict(item.split("=", 1) for item in init_data.split("&"))
-        check_hash = parsed.pop("hash", "")
-        data_check = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-
-        secret_key = hmac.new(b"WebAppData", settings.TELEGRAM_BOT_TOKEN.encode(), hashlib.sha256).digest()
-        computed = hmac.new(secret_key, data_check.encode(), hashlib.sha256).hexdigest()
-
-        if not hmac.compare_digest(computed, check_hash):
-            raise ValueError("Invalid hash")
-
-        user_data = json.loads(parsed.get("user", "{}"))
-        return user_data
-    except Exception as e:
-        logger.error("Telegram auth error", error=str(e))
-        raise HTTPException(status_code=401, detail="Invalid Telegram auth data")
+def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
+    """
+    Правильная проверка по документации Telegram.
+    Возвращает данные пользователя или бросает ValueError.
+    """
+    # 1. Парсим initData как query string
+    parsed = dict(parse_qsl(init_data, strict_parsing=True))
+    
+    hash_from_telegram = parsed.pop("hash", None)
+    if not hash_from_telegram:
+        raise ValueError("No hash in initData")
+    
+    # 2. Проверяем свежесть (не старше 24 часов)
+    auth_date = int(parsed.get("auth_date", 0))
+    if time() - auth_date > 86400:
+        raise ValueError("initData expired")
+    
+    # 3. Сортируем оставшиеся поля по алфавиту и строим строку
+    data_check_string = "\n".join(
+        f"{k}={v}" for k, v in sorted(parsed.items())
+    )
+    
+    # 4. HMAC — ключ это HMAC(bot_token, "WebAppData"), а НЕ сам токен!
+    secret_key = hmac.new(
+        b"WebAppData",          # <-- вот главная ошибка у большинства
+        bot_token.encode(),
+        hashlib.sha256
+    ).digest()
+    
+    expected_hash = hmac.new(
+        secret_key,
+        data_check_string.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    if not hmac.compare_digest(expected_hash, hash_from_telegram):
+        raise ValueError("Invalid Telegram auth data")
+    
+    # 5. Возвращаем распарсенного юзера
+    user_data = json.loads(unquote(parsed["user"]))
+    return user_data
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
