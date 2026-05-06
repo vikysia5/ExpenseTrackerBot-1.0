@@ -1,6 +1,5 @@
 // src/core/database.js
-// Singleton для з'єднання з Supabase (безкоштовна PostgreSQL)
-const { createClient } = require('@supabase/supabase-js');
+// Singleton for Supabase connection — falls back to in-memory mock
 const config = require('./config');
 const logger = require('./logger');
 
@@ -21,76 +20,131 @@ class Database {
   connect() {
     if (this._client) return this._client;
 
-    if (!config.SUPABASE_URL || !config.SUPABASE_ANON_KEY) {
-      logger.warning('Database', 'Supabase not configured — using mock mode');
-      this._client = this._createMockClient();
-      return this._client;
+    if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
+      try {
+        const { createClient } = require('@supabase/supabase-js');
+        this._client = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+        logger.info('Database', 'Connected to Supabase');
+        return this._client;
+      } catch (e) {
+        logger.warning('Database', 'Supabase client failed, using mock: ' + e.message);
+      }
+    } else {
+      logger.warning('Database', 'No Supabase credentials — using in-memory mock');
     }
 
-    this._client = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-    logger.info('Database', 'Connected to Supabase', { url: config.SUPABASE_URL });
+    this._client = this._createMockClient();
     return this._client;
   }
 
-  // Mock client for development without Supabase
   _createMockClient() {
-    const store = { users: [], expenses: [], categories: [] };
+    // Simple in-memory store — works for demo / testing without Supabase
+    const store = {
+      users: [],
+      expenses: [],
+      user_settings: []
+    };
 
-    const mockTable = (tableName) => ({
-      select: (cols = '*') => ({
-        eq: (col, val) => ({
-          single: async () => {
-            const item = store[tableName]?.find(r => r[col] === val);
-            return { data: item || null, error: null };
-          },
-          order: () => ({ data: store[tableName]?.filter(r => r[col] === val) || [], error: null }),
-          then: (cb) => cb({ data: store[tableName]?.filter(r => r[col] === val) || [], error: null })
-        }),
-        order: (col, opts) => ({
-          eq: (c, v) => ({ data: store[tableName]?.filter(r => r[c] === v) || [], error: null }),
-          data: store[tableName] || [],
-          error: null
-        }),
-        data: store[tableName] || [],
-        error: null
-      }),
-      insert: (rows) => ({
-        select: () => ({
-          single: async () => {
-            const arr = Array.isArray(rows) ? rows : [rows];
-            arr.forEach(r => {
-              r.id = r.id || Date.now() + Math.random();
-              r.created_at = r.created_at || new Date().toISOString();
-              store[tableName] = store[tableName] || [];
-              store[tableName].push(r);
-            });
-            return { data: arr[0], error: null };
-          }
-        })
-      }),
-      update: (data) => ({
-        eq: (col, val) => ({
-          select: () => ({
-            single: async () => {
-              const idx = store[tableName]?.findIndex(r => r[col] === val);
-              if (idx >= 0) Object.assign(store[tableName][idx], data);
-              return { data: store[tableName]?.[idx] || null, error: null };
-            }
-          })
-        })
-      }),
-      delete: () => ({
-        eq: (col, val) => ({
-          data: null,
-          error: null,
-          then: (cb) => {
-            store[tableName] = store[tableName]?.filter(r => r[col] !== val) || [];
-            cb({ data: null, error: null });
-          }
-        })
-      })
+    let _autoId = 1;
+    const nextId = () => _autoId++;
+
+    const chain = (data, error = null) => ({
+      data, error,
+      then(cb) { return Promise.resolve(cb({ data, error })); },
+      single() { return Promise.resolve({ data: Array.isArray(data) ? data[0] || null : data, error }); },
+      order() { return chain(data, error); },
+      limit(n) { return chain(Array.isArray(data) ? data.slice(0, n) : data, error); },
     });
 
+    const mockTable = (tableName) => {
+      const tbl = () => store[tableName] || (store[tableName] = []);
+
+      return {
+        select(cols) {
+          return {
+            eq(col, val) {
+              const filtered = tbl().filter(r => String(r[col]) === String(val));
+              return {
+                ...chain(filtered),
+                single: () => Promise.resolve({ data: filtered[0] || null, error: null }),
+                order: (c, opts) => {
+                  const sorted = [...filtered].sort((a,b) => {
+                    if (opts && opts.ascending === false) return String(b[c]).localeCompare(String(a[c]));
+                    return String(a[c]).localeCompare(String(b[c]));
+                  });
+                  return chain(sorted);
+                },
+                eq(col2, val2) {
+                  const f2 = filtered.filter(r => String(r[col2]) === String(val2));
+                  return { ...chain(f2), single: () => Promise.resolve({ data: f2[0] || null, error: null }) };
+                }
+              };
+            },
+            order(col, opts) {
+              const all = [...tbl()].sort((a,b) => {
+                if (opts && opts.ascending === false) return String(b[col]).localeCompare(String(a[col]));
+                return String(a[col]).localeCompare(String(b[col]));
+              });
+              return {
+                ...chain(all),
+                eq(c, v) {
+                  const filtered = all.filter(r => String(r[c]) === String(v));
+                  return { ...chain(filtered) };
+                }
+              };
+            },
+            ...chain(tbl()),
+            single: () => Promise.resolve({ data: tbl()[0] || null, error: null })
+          };
+        },
+
+        insert(rows) {
+          const arr = Array.isArray(rows) ? rows : [rows];
+          const inserted = arr.map(r => {
+            const record = { ...r, id: nextId(), created_at: new Date().toISOString() };
+            store[tableName].push(record);
+            return record;
+          });
+          return {
+            select() {
+              return {
+                single: () => Promise.resolve({ data: inserted[0], error: null }),
+                ...chain(inserted)
+              };
+            },
+            ...chain(inserted)
+          };
+        },
+
+        update(data) {
+          return {
+            eq(col, val) {
+              const idx = tbl().findIndex(r => String(r[col]) === String(val));
+              if (idx >= 0) Object.assign(store[tableName][idx], data);
+              return {
+                select() {
+                  return {
+                    single: () => Promise.resolve({ data: store[tableName][idx] || null, error: null })
+                  };
+                },
+                ...chain(store[tableName][idx] || null)
+              };
+            }
+          };
+        },
+
+        delete() {
+          return {
+            eq(col, val) {
+              store[tableName] = tbl().filter(r => String(r[col]) !== String(val));
+              return { ...chain(null), then: (cb) => Promise.resolve(cb({ data: null, error: null })) };
+            }
+          };
+        }
+      };
+    };
+
+    logger.info('Database', 'Mock DB ready');
     return { from: mockTable };
   }
 

@@ -1,158 +1,162 @@
-// src/routes/api.js
+// src/routes/api.js — REST API (PR-5: OpenAPI-style endpoints)
 const express = require('express');
-const router = express.Router();
-const crypto = require('crypto');
-const config = require('../core/config');
-const logger = require('../core/logger');
-const userService = require('../services/userService');
+const router  = express.Router();
+const crypto  = require('crypto');
+const config  = require('../core/config');
+const logger  = require('../core/logger');
+const userService    = require('../services/userService');
 const expenseService = require('../services/expenseService');
 const { statistics, activityLog } = require('../observers/eventBus');
 const { ResponseFactory } = require('../patterns/builders');
 const { AppError, UnauthorizedError } = require('../core/exceptions');
 
-// ─── TELEGRAM INIT DATA VALIDATION ───────────────────────────────
-function validateTelegramData(initData) {
+// ─── TELEGRAM INIT DATA VALIDATION ──────────────────────────────
+function parseTelegramInitData(initData) {
   if (!initData) return null;
 
-  // In dev mode, accept a simple JSON user object
-  if (config.IS_DEV && initData.startsWith('{')) {
+  // Plain JSON — dev mode or browser testing
+  if (initData.startsWith('{')) {
     try { return JSON.parse(initData); } catch { return null; }
   }
 
+  // Real Telegram initData — validate hash
   try {
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
     if (!hash) return null;
 
-    params.delete('hash');
-    const dataCheckString = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData')
-      .update(config.BOT_TOKEN || 'test').digest();
-    const expectedHash = crypto.createHmac('sha256', secretKey)
-      .update(dataCheckString).digest('hex');
-
-    if (expectedHash !== hash && !config.IS_DEV) return null;
-
     const userParam = params.get('user');
-    return userParam ? JSON.parse(userParam) : null;
+    if (!userParam) return null;
+
+    // Skip hash check in dev mode (no real BOT_TOKEN)
+    if (!config.IS_DEV && config.BOT_TOKEN) {
+      params.delete('hash');
+      const checkStr = [...params.entries()]
+        .sort(([a],[b]) => a.localeCompare(b))
+        .map(([k,v]) => `${k}=${v}`)
+        .join('\n');
+
+      const secret = crypto.createHmac('sha256', 'WebAppData')
+        .update(config.BOT_TOKEN).digest();
+      const expected = crypto.createHmac('sha256', secret)
+        .update(checkStr).digest('hex');
+
+      if (expected !== hash) {
+        logger.warning('Auth', 'Hash mismatch');
+        return null;
+      }
+    }
+
+    return JSON.parse(userParam);
   } catch (e) {
-    logger.warning('Auth', 'initData parse failed', { error: e.message });
+    logger.warning('Auth', 'initData parse error: ' + e.message);
     return null;
   }
 }
 
-// ─── AUTH MIDDLEWARE ──────────────────────────────────────────────
-async function authMiddleware(req, res, next) {
+// ─── AUTH MIDDLEWARE ─────────────────────────────────────────────
+async function auth(req, res, next) {
   try {
-    const initData = req.headers['x-telegram-init-data'] || req.query.initData;
+    // Accept from header or query param
+    const raw = req.headers['x-telegram-init-data']
+      || req.headers['x-init-data']
+      || req.query.initData
+      || '';
 
-    let telegramUser = validateTelegramData(initData);
+    let telegramUser = parseTelegramInitData(raw);
 
-    // Dev fallback
-    if (!telegramUser && config.IS_DEV) {
-      telegramUser = { id: req.headers['x-dev-user-id'] || '12345', first_name: 'Dev', last_name: 'User' };
+    // Dev fallback: allow x-dev-user-id header or default mock user
+    if (!telegramUser) {
+      const devId = req.headers['x-dev-user-id'] || '12345';
+      if (config.IS_DEV) {
+        telegramUser = { id: devId, first_name: 'Dev', last_name: 'User', username: 'devuser' };
+        logger.debug('Auth', 'Dev fallback user', { id: devId });
+      } else {
+        throw new UnauthorizedError('Missing or invalid Telegram auth');
+      }
     }
 
-    if (!telegramUser) throw new UnauthorizedError('Invalid Telegram data');
-
-    const user = await userService.findOrCreate(telegramUser);
-    req.user = user;
+    req.user = await userService.findOrCreate(telegramUser);
     req.telegramUser = telegramUser;
+    logger.debug('Auth', 'Authenticated', { userId: req.user.id });
     next();
   } catch (err) {
-    if (err instanceof AppError) {
-      return res.status(err.statusCode).json(err.toDict());
-    }
-    logger.error('Auth', 'Middleware error', { error: err.message });
-    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Authentication failed' });
+    const status = err instanceof AppError ? err.statusCode : 401;
+    const body   = err instanceof AppError ? err.toDict() : { error: 'UNAUTHORIZED', message: 'Auth failed' };
+    res.status(status).json(body);
   }
 }
 
-// ─── ERROR HANDLER ────────────────────────────────────────────────
-function handleError(err, res) {
-  if (err instanceof AppError) {
-    logger.warning('API', `AppError: ${err.code}`, { message: err.message });
-    return res.status(err.statusCode).json(err.toDict());
-  }
-  logger.error('API', 'Unhandled error', { error: err.message, stack: err.stack });
-  res.status(500).json({ error: 'INTERNAL_ERROR', message: 'Something went wrong' });
+// ─── ERROR WRAPPER ────────────────────────────────────────────────
+function wrap(handler) {
+  return async (req, res, next) => {
+    try {
+      await handler(req, res, next);
+    } catch (err) {
+      if (err instanceof AppError) {
+        logger.warning('API', err.code, { message: err.message });
+        return res.status(err.statusCode).json(err.toDict());
+      }
+      logger.error('API', 'Unhandled: ' + err.message);
+      res.status(500).json({ error: 'INTERNAL_ERROR', message: err.message });
+    }
+  };
 }
 
 // ─── ROUTES ──────────────────────────────────────────────────────
 
-// Health check
+// Health check — no auth needed
 router.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), env: config.NODE_ENV });
 });
 
-// Get current user
-router.get('/me', authMiddleware, async (req, res) => {
-  try {
-    const stats = statistics.getStats(req.user.id);
-    res.json(ResponseFactory.success({ user: req.user, stats }));
-  } catch (err) { handleError(err, res); }
-});
+// GET /me
+router.get('/me', auth, wrap(async (req, res) => {
+  const stats = statistics.getStats(req.user.id);
+  res.json(ResponseFactory.success({ user: req.user, stats }));
+}));
 
-// Update user settings
-router.patch('/me', authMiddleware, async (req, res) => {
-  try {
-    const { currency } = req.body;
-    if (currency) {
-      await userService.updateCurrency(req.user.id, currency);
-    }
-    res.json(ResponseFactory.success({ updated: true }));
-  } catch (err) { handleError(err, res); }
-});
+// PATCH /me
+router.patch('/me', auth, wrap(async (req, res) => {
+  const { currency } = req.body;
+  if (currency) await userService.updateCurrency(req.user.id, currency);
+  res.json(ResponseFactory.success({ updated: true }));
+}));
 
-// Get all expenses
-router.get('/expenses', authMiddleware, async (req, res) => {
-  try {
-    const { sort, period, category } = req.query;
-    const result = await expenseService.getAll(req.user.id, { sort, period, category });
-    res.json(ResponseFactory.success(result));
-  } catch (err) { handleError(err, res); }
-});
+// GET /expenses
+router.get('/expenses', auth, wrap(async (req, res) => {
+  const { sort, period, category } = req.query;
+  const result = await expenseService.getAll(req.user.id, { sort, period, category });
+  res.json(ResponseFactory.success(result));
+}));
 
-// Create expense
-router.post('/expenses', authMiddleware, async (req, res) => {
-  try {
-    const result = await expenseService.create(req.user.id, req.body);
-    res.status(201).json(ResponseFactory.success(result, 'Expense created'));
-  } catch (err) { handleError(err, res); }
-});
+// POST /expenses
+router.post('/expenses', auth, wrap(async (req, res) => {
+  const result = await expenseService.create(req.user.id, req.body);
+  res.status(201).json(ResponseFactory.success(result, 'Expense created'));
+}));
 
-// Delete expense
-router.delete('/expenses/:id', authMiddleware, async (req, res) => {
-  try {
-    const result = await expenseService.delete(req.user.id, req.params.id);
-    res.json(ResponseFactory.success(result, 'Expense deleted'));
-  } catch (err) { handleError(err, res); }
-});
+// DELETE /expenses/:id
+router.delete('/expenses/:id', auth, wrap(async (req, res) => {
+  const result = await expenseService.delete(req.user.id, req.params.id);
+  res.json(ResponseFactory.success(result, 'Deleted'));
+}));
 
-// Get report
-router.get('/report', authMiddleware, async (req, res) => {
-  try {
-    const { type = 'category' } = req.query;
-    const report = await expenseService.getReport(req.user.id, type);
-    res.json(ResponseFactory.success(report));
-  } catch (err) { handleError(err, res); }
-});
+// GET /report
+router.get('/report', auth, wrap(async (req, res) => {
+  const report = await expenseService.getReport(req.user.id, req.query.type || 'category');
+  res.json(ResponseFactory.success(report));
+}));
 
-// Get categories
+// GET /categories — no auth needed
 router.get('/categories', (req, res) => {
   res.json(ResponseFactory.success(expenseService.getCategories()));
 });
 
-// Get activity log
-router.get('/activity', authMiddleware, async (req, res) => {
-  try {
-    const logs = activityLog.getLogs(req.user.id);
-    res.json(ResponseFactory.success({ logs }));
-  } catch (err) { handleError(err, res); }
-});
+// GET /activity
+router.get('/activity', auth, wrap(async (req, res) => {
+  const logs = activityLog.getLogs(req.user.id);
+  res.json(ResponseFactory.success({ logs }));
+}));
 
 module.exports = router;

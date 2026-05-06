@@ -1,35 +1,40 @@
 // src/services/expenseService.js
-// SRP: expense business logic only | All patterns from Module 3
+// SRP: expense logic | All Module 3 patterns applied
 
-const database = require('../core/database');
-const logger = require('../core/logger');
-const { ExpenseNotFoundError, DatabaseError, ValidationError } = require('../core/exceptions');
+const database  = require('../core/database');
+const logger    = require('../core/logger');
+const { ExpenseNotFoundError, DatabaseError } = require('../core/exceptions');
 const { bus, statistics } = require('../observers/eventBus');
 const { SortStrategyFactory, FilterByPeriod, ReportStrategyFactory } = require('../strategies/sortStrategy');
 const { ExpenseBuilder, NotificationFactory } = require('../patterns/builders');
 const ExpenseValidator = require('../validators/expenseValidator');
 const { timer, gatherSafe, runBackground } = require('../core/decorators');
 
-// CONSTANTS — no magic numbers (ПР-11 refactoring)
+// CONSTANTS — no magic numbers (PR-11)
 const DEFAULT_PAGE_SIZE = 50;
-const MAX_EXPORT_ROWS = 1000;
+
+const CATEGORY_EMOJIS = {
+  food:'🍔', transport:'🚗', housing:'🏠', health:'💊',
+  entertainment:'🎮', shopping:'🛍', education:'📚', travel:'✈️',
+  salary:'💵', freelance:'💻', investment:'📈', gift:'🎁', other:'📦'
+};
 
 class ExpenseService {
   constructor(db) {
     this.db = db;
-    // Apply timer decorator to key methods (ПР-9 Decorator)
-    this.getAll = timer(this.getAll.bind(this), 'expenseService.getAll');
-    this.create = timer(this.create.bind(this), 'expenseService.create');
+    // Apply Decorator pattern (PR-9)
+    this.getAll  = timer(this.getAll.bind(this),  'expenseService.getAll');
+    this.create  = timer(this.create.bind(this),  'expenseService.create');
   }
 
-  // ─── CREATE ──────────────────────────────────────────────────────
+  // ─── CREATE ────────────────────────────────────────────────────
   async create(userId, rawData) {
-    logger.info('ExpenseService', 'create start', { userId, category: rawData.category });
+    logger.info('ExpenseService', 'create', { userId, category: rawData.category });
 
-    // Validate input (ПР-10)
+    // Validate (PR-10)
     const validated = ExpenseValidator.validate(rawData);
 
-    // Use Builder pattern (ПР-8)
+    // Builder pattern (PR-8)
     const expense = new ExpenseBuilder(validated.amount)
       .type(validated.type)
       .category(validated.category)
@@ -50,9 +55,9 @@ class ExpenseService {
       throw new DatabaseError('insert expense', error.message);
     }
 
-    logger.info('ExpenseService', 'Expense created', { id: data.id, amount: data.amount });
+    logger.info('ExpenseService', 'Created', { id: data.id, amount: data.amount });
 
-    // Emit event to all observers (ПР-9 Observer) — non-blocking background
+    // Observer: emit event in background (PR-9 + PR-12)
     runBackground(
       () => bus.emit('expense:created', {
         userId, amount: data.amount, category: data.category,
@@ -61,7 +66,7 @@ class ExpenseService {
       'emit expense:created'
     );
 
-    // Build notification (ПР-8 Factory)
+    // Factory: build notification message (PR-8)
     const notification = NotificationFactory.create('expense_created', {
       type: data.type, currency: data.currency,
       amount: data.amount, category: data.category
@@ -70,92 +75,96 @@ class ExpenseService {
     return { expense: data, notification };
   }
 
-  // ─── GET ALL (async parallel fetch: ПР-12) ───────────────────────
+  // ─── GET ALL — parallel fetch with gather (PR-12) ──────────────
   async getAll(userId, opts = {}) {
     logger.debug('ExpenseService', 'getAll', { userId, opts });
-
     const { sort = 'date_desc', period, category } = opts;
 
-    // Parallel fetch: expenses + user stats simultaneously (ПР-12 gather)
-    const [expensesResult, statsData] = await gatherSafe(
+    // Parallel: expenses + stats (PR-12 Promise.allSettled)
+    const [expensesResult] = await gatherSafe(
       this._fetchExpenses(userId),
-      Promise.resolve(statistics.getStats(userId))
     );
 
     let expenses = expensesResult || [];
 
-    // Apply filter strategy (ПР-9 Strategy)
+    // Filter Strategy (PR-9)
     if (period === 'month') expenses = FilterByPeriod.thisMonth(expenses);
     else if (period === 'week') expenses = FilterByPeriod.thisWeek(expenses);
     if (category) expenses = FilterByPeriod.byCategory(expenses, category);
 
-    // Apply sort strategy (ПР-9 Strategy + ПР-8 Factory)
+    // Sort Strategy + Factory (PR-9 + PR-8)
     const strategy = SortStrategyFactory.create(sort);
     expenses = strategy.sort(expenses);
 
-    const total = expenses.reduce((s, e) => e.type === 'expense' ? s + Number(e.amount) : s, 0);
-    const income = expenses.reduce((s, e) => e.type === 'income' ? s + Number(e.amount) : s, 0);
+    const total  = expenses.filter(e => e.type === 'expense').reduce((s,e) => s + Number(e.amount), 0);
+    const income = expenses.filter(e => e.type === 'income').reduce((s,e) => s + Number(e.amount), 0);
 
-    logger.debug('ExpenseService', 'getAll done', { count: expenses.length });
-    return { expenses: expenses.slice(0, DEFAULT_PAGE_SIZE), total, income, stats: statsData };
+    return {
+      expenses: expenses.slice(0, DEFAULT_PAGE_SIZE),
+      total: parseFloat(total.toFixed(2)),
+      income: parseFloat(income.toFixed(2))
+    };
   }
 
   async _fetchExpenses(userId) {
-    const { data, error } = await this.db.client
+    const result = await this.db.client
       .from('expenses')
       .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .eq('user_id', userId);
+
+    // Handle both chained and direct result formats
+    const data  = result.data  || [];
+    const error = result.error || null;
 
     if (error) throw new DatabaseError('fetch expenses', error.message);
-    return data || [];
+    return Array.isArray(data) ? data : [];
   }
 
-  // ─── DELETE ──────────────────────────────────────────────────────
+  // ─── DELETE ────────────────────────────────────────────────────
   async delete(userId, expenseId) {
     logger.info('ExpenseService', 'delete', { userId, expenseId });
 
-    const { data: existing } = await this.db.client
-      .from('expenses').select('*').eq('id', expenseId).eq('user_id', userId).single();
+    // Find first to verify ownership
+    const findRes = await this.db.client
+      .from('expenses')
+      .select('*')
+      .eq('id', expenseId)
+      .eq('user_id', userId)
+      .single();
 
+    const existing = findRes.data;
     if (!existing) throw new ExpenseNotFoundError(expenseId);
 
-    const { error } = await this.db.client
-      .from('expenses').delete().eq('id', expenseId).eq('user_id', userId);
-
-    if (error) throw new DatabaseError('delete expense', error.message);
+    await this.db.client
+      .from('expenses')
+      .delete()
+      .eq('id', expenseId)
+      .eq('user_id', userId);
 
     runBackground(
-      () => bus.emit('expense:deleted', { userId, amount: existing.amount, category: existing.category }),
+      () => bus.emit('expense:deleted', { userId, amount: existing.amount }),
       'emit expense:deleted'
     );
 
     return { deleted: true, expense: existing };
   }
 
-  // ─── REPORT (Strategy pattern ПР-9) ──────────────────────────────
+  // ─── REPORT — Strategy pattern (PR-9) ──────────────────────────
   async getReport(userId, type = 'category') {
-    logger.info('ExpenseService', 'getReport', { userId, type });
     const expenses = await this._fetchExpenses(userId);
     const onlyExpenses = expenses.filter(e => e.type === 'expense');
     const strategy = ReportStrategyFactory.create(type);
     return strategy.generate(onlyExpenses);
   }
 
-  // ─── GET CATEGORIES ──────────────────────────────────────────────
   getCategories() {
     return ExpenseValidator.allowedCategories.map(c => ({
       id: c,
       label: c.charAt(0).toUpperCase() + c.slice(1),
-      emoji: CATEGORY_EMOJIS[c] || '💰'
+      emoji: CATEGORY_EMOJIS[c] || '📦'
     }));
   }
 }
 
-const CATEGORY_EMOJIS = {
-  food: '🍔', transport: '🚗', housing: '🏠', health: '💊',
-  entertainment: '🎮', shopping: '🛍', education: '📚', travel: '✈️',
-  salary: '💵', freelance: '💻', investment: '📈', gift: '🎁', other: '📦'
-};
-
-module.exports = new ExpenseService(require('../core/database'));
+module.exports = new ExpenseService(database);
