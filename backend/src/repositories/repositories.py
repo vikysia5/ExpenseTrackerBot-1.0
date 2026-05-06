@@ -166,10 +166,24 @@ class UserRepository:
         existing = await self.get_by_telegram_id(telegram_data["id"])
         if existing:
             return existing
+        
+        # Build user dict with telegram_id and optional fields
         user = {
             "telegram_id": telegram_data["id"],
-            "first_name": telegram_data.get("first_name"),
-            "last_name": telegram_data.get("last_name"),
-            "username": telegram_data.get("username"),
         }
-        return await self.create(user)
+        
+        # Try to add optional fields
+        optional_fields = ["first_name", "last_name", "username"]
+        for field in optional_fields:
+            if field in telegram_data:
+                user[field] = telegram_data.get(field)
+        
+        try:
+            return await self.create(user)
+        except Exception as e:
+            # If error is about missing columns, create with only telegram_id
+            if "PGRST204" in str(e) or "column" in str(e).lower():
+                logger.warning("Columns don't exist in schema, creating with minimal data", error=str(e))
+                user = {"telegram_id": telegram_data["id"]}
+                return await self.create(user)
+            raise
