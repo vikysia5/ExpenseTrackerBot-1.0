@@ -1,0 +1,2 @@
+# This file forces Nixpacks to detect Python runtime
+# instead of treating this as a static nginx site
