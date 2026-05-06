@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Expense Tracker</title>
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================
+       CSS VARIABLES & RESET
+    ============================================ */
+    :root {
+      --purple: #7C3AED;
+      --purple-light: #A78BFA;
+      --purple-dark: #5B21B6;
+      --orange: #F97316;
+      --orange-light: #FED7AA;
+      --green: #10B981;
+      --red: #EF4444;
+      --bg: #F5F3FF;
+      --card: #FFFFFF;
+      --text: #1E1B4B;
+      --text-2: #6B7280;
+      --border: #E5E7EB;
+      --shadow: 0 4px 24px rgba(124,58,237,0.10);
+      --shadow-lg: 0 8px 40px rgba(124,58,237,0.18);
+      --radius: 20px;
+      --radius-sm: 12px;
+      --nav-h: 72px;
+      --header-h: 60px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ============================================
+       SCREENS
+    ============================================ */
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+    .screen.active { display: flex; }
+
+    /* ============================================
+       SPLASH SCREEN
+    ============================================ */
+    #screen-splash {
+      background: linear-gradient(160deg, #5B21B6 0%, #7C3AED 50%, #A78BFA 100%);
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 32px;
+    }
+    .splash-art {
+      width: 200px; height: 200px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 40px;
+      position: relative;
+      animation: float 3s ease-in-out infinite;
+    }
+    .splash-art::before {
+      content: '';
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.3);
+      animation: spin 20s linear infinite;
+    }
+    .splash-art-inner {
+      font-size: 80px;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .splash-title {
+      font-size: 28px; font-weight: 700;
+      color: #fff; line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .splash-sub {
+      font-size: 15px; color: rgba(255,255,255,0.75);
+      line-height: 1.6; margin-bottom: 48px;
+    }
+    .btn-primary {
+      background: #fff;
+      color: var(--purple);
+      border: none;
+      border-radius: 100px;
+      padding: 16px 48px;
+      font-size: 17px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .btn-primary:active { transform: scale(0.96); }
+
+    /* ============================================
+       AUTH SCREEN
+    ============================================ */
+    #screen-auth {
+      background: #fff;
+      overflow-y: auto;
+    }
+    .auth-header {
+      padding: 48px 32px 32px;
+      text-align: center;
+    }
+    .auth-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--purple-light), var(--purple));
+      border-radius: 24px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 24px;
+      box-shadow: 0 8px 24px rgba(124,58,237,0.3);
+    }
+    .auth-title { font-size: 24px; font-weight: 700; color: var(--text); }
+    .auth-sub { font-size: 14px; color: var(--text-2); margin-top: 6px; }
+    .auth-body { padding: 0 24px 40px; }
+    .btn-telegram {
+      width: 100%;
+      background: #229ED9;
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-size: 15px; font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 20px; color: var(--text-2); font-size: 13px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .input-group { margin-bottom: 16px; position: relative; }
+    .input-group label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: var(--text-2); margin-bottom: 6px;
+    }
+    .input-group input {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 13px 16px;
+      font-size: 15px;
+      font-family: inherit;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+      background: #FAFAFA;
+    }
+    .input-group input:focus { border-color: var(--purple); background: #fff; }
+    .input-group .input-icon {
+      position: absolute; right: 14px; bottom: 14px;
+      font-size: 18px; color: var(--text-2); cursor: pointer;
+    }
+    .auth-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; font-size: 13px;
+    }
+    .auth-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .auth-row a { color: var(--purple); text-decoration: none; font-weight: 500; }
+    .btn-auth {
+      width: 100%;
+      background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      font-size: 16px; font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(124,58,237,0.35);
+      transition: opacity 0.15s;
+    }
+    .btn-auth:active { opacity: 0.9; }
+    .auth-switch {
+      text-align: center; margin-top: 20px; font-size: 14px; color: var(--text-2);
+    }
+    .auth-switch a { color: var(--purple); font-weight: 600; cursor: pointer; }
+    .auth-error {
+      background: #FEF2F2; border: 1px solid #FECACA;
+      border-radius: var(--radius-sm); padding: 12px;
+      color: var(--red); font-size: 13px; margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ============================================
+       MAIN LAYOUT (with bottom nav)
+    ============================================ */
+    #screen-main {
+      background: var(--bg);
+      position: relative;
+    }
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-bottom: var(--nav-h);
+      -webkit-overflow-scrolling: touch;
+    }
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: #fff;
+      display: flex; align-items: center; justify-content: space-around;
+      border-top: 1px solid var(--border);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 4px; padding: 8px 16px; cursor: pointer;
+      color: var(--text-2); font-size: 11px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-item.active { color: var(--purple); }
+    .nav-icon { font-size: 22px; }
+    .fab {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, var(--purple), var(--orange));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #fff; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(124,58,237,0.5);
+      margin-top: -24px;
+      transition: transform 0.2s;
+    }
+    .fab:active { transform: scale(0.92); }
+
+    /* ============================================
+       TAB PANELS (inside screen-main)
+    ============================================ */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ============================================
+       HOME TAB
+    ============================================ */
+    .home-hero {
+      background: linear-gradient(145deg, #5B21B6, #7C3AED, #9333EA);
+      padding: 24px 20px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .home-hero::before {
+      content: '';
+      position: absolute; bottom: -40px; left: -40px; right: -40px;
+      height: 80px;
+      background: var(--bg);
+      border-radius: 50%;
+    }
+    .hero-label {
+      font-size: 12px; color: rgba(255,255,255,0.7); letter-spacing: 0.5px;
+      text-transform: uppercase; margin-bottom: 6px;
+    }
+    .hero-balance {
+      font-size: 36px; font-weight: 700; color: #fff; margin-bottom: 20px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero-chips {
+      display: flex; gap: 12px;
+    }
+    .hero-chip {
+      flex: 1;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hero-chip-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .chip-income .hero-chip-icon { background: rgba(16,185,129,0.25); }
+    .chip-expense .hero-chip-icon { background: rgba(249,115,22,0.25); }
+    .hero-chip-label { font-size: 11px; color: rgba(255,255,255,0.7); }
+    .hero-chip-value { font-size: 15px; font-weight: 700; color: #fff; }
+
+    .section { padding: 20px; }
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+    }
+    .section-title { font-size: 17px; font-weight: 700; }
+    .section-link { font-size: 13px; color: var(--purple); font-weight: 500; cursor: pointer; }
+
+    /* ============================================
+       TRANSACTION ITEM
+    ============================================ */
+    .tx-list { display: flex; flex-direction: column; gap: 10px; }
+    .tx-item {
+      background: #fff;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .tx-item:active { transform: scale(0.98); }
+    .tx-icon {
+      width: 44px; height: 44px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-time { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+    .tx-amount { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .tx-amount.income { color: var(--green); }
+    .tx-amount.expense { color: var(--red); }
+
+    .empty-state {
+      text-align: center; padding: 48px 24px; color: var(--text-2);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; }
+
+    /* ============================================
+       OVERVIEW TAB
+    ============================================ */
+    .overview-header {
+      background: linear-gradient(145deg, #5B21B6, #7C3AED);
+      padding: 20px 20px 24px;
+    }
+    .overview-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 16px; }
+    .overview-chips { display: flex; gap: 10px; }
+    .ov-chip {
+      flex: 1; background: rgba(255,255,255,0.15);
+      border-radius: var(--radius-sm); padding: 12px;
+    }
+    .ov-chip-label { font-size: 11px; color: rgba(255,255,255,0.7); margin-bottom: 4px; }
+    .ov-chip-val { font-size: 18px; font-weight: 700; color: #fff; }
+    .ov-chip-val.orange { color: #FED7AA; }
+
+    .stats-section { padding: 20px; }
+    .stats-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .stats-title { font-size: 17px; font-weight: 700; }
+    .month-selector {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 100px; padding: 6px 14px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* Bar chart */
+    .bar-chart {
+      background: #fff; border-radius: var(--radius);
+      padding: 20px; margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .chart-bars {
+      display: flex; align-items: flex-end; gap: 8px;
+      height: 120px; margin-bottom: 8px;
+    }
+    .chart-bar-group { flex: 1; display: flex; gap: 3px; align-items: flex-end; }
+    .chart-bar {
+      flex: 1; border-radius: 4px 4px 0 0;
+      min-height: 4px; transition: height 0.6s ease;
+    }
+    .bar-income { background: var(--purple-light); }
+    .bar-expense { background: var(--orange); }
+    .chart-labels {
+      display: flex; gap: 8px;
+    }
+    .chart-label { flex: 1; text-align: center; font-size: 10px; color: var(--text-2); }
+
+    .chart-legend {
+      display: flex; gap: 16px; margin-top: 12px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* Toggle tabs */
+    .toggle-tabs {
+      display: flex; background: var(--border); border-radius: 100px;
+      padding: 4px; margin-bottom: 16px;
+    }
+    .toggle-tab {
+      flex: 1; text-align: center; padding: 9px;
+      border-radius: 100px; font-size: 14px; font-weight: 600;
+      cursor: pointer; color: var(--text-2); transition: all 0.2s;
+    }
+    .toggle-tab.active {
+      background: var(--purple); color: #fff;
+      box-shadow: 0 2px 8px rgba(124,58,237,0.3);
+    }
+    .toggle-tab.active-orange { background: var(--orange); color: #fff; box-shadow: 0 2px 8px rgba(249,115,22,0.3); }
+
+    /* ============================================
+       ADD EXPENSE SCREEN (modal)
+    ============================================ */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 200;
+      align-items: flex-end;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-sheet {
+      width: 100%; background: #fff;
+      border-radius: 28px 28px 0 0;
+      padding: 12px 24px 40px;
+      max-height: 92dvh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 40px; height: 4px; background: var(--border);
+      border-radius: 100px; margin: 0 auto 20px;
+    }
+    .sheet-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .type-toggle {
+      display: flex; background: var(--bg); border-radius: var(--radius-sm);
+      padding: 4px; margin-bottom: 20px;
+    }
+    .type-btn {
+      flex: 1; padding: 10px; text-align: center;
+      border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+      cursor: pointer; color: var(--text-2); transition: all 0.2s;
+    }
+    .type-btn.active-income { background: var(--green); color: #fff; }
+    .type-btn.active-expense { background: var(--red); color: #fff; }
+
+    .amount-input-wrap {
+      background: var(--bg); border-radius: var(--radius-sm);
+      padding: 16px; margin-bottom: 16px; text-align: center;
+    }
+    .amount-input-label { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+    .amount-input {
+      width: 100%; background: transparent; border: none; outline: none;
+      font-size: 36px; font-weight: 700; text-align: center;
+      font-family: 'DM Mono', monospace; color: var(--text);
+    }
+    .amount-input::placeholder { color: var(--border); }
+
+    .add-input {
+      width: 100%; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); padding: 13px 16px;
+      font-size: 15px; font-family: inherit; color: var(--text);
+      outline: none; margin-bottom: 12px; transition: border-color 0.2s;
+      background: #FAFAFA;
+    }
+    .add-input:focus { border-color: var(--purple); background: #fff; }
+
+    .add-select {
+      width: 100%; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); padding: 13px 16px;
+      font-size: 15px; font-family: inherit; color: var(--text);
+      outline: none; margin-bottom: 12px; background: #FAFAFA;
+      appearance: none; cursor: pointer;
+    }
+
+    .payment-btns {
+      display: flex; gap: 8px; margin-bottom: 20px;
+    }
+    .payment-btn {
+      flex: 1; padding: 10px 6px; text-align: center;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      color: var(--text-2); transition: all 0.2s;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .payment-btn.active { border-color: var(--purple); color: var(--purple); background: #F5F3FF; }
+    .payment-btn .p-icon { font-size: 20px; }
+
+    .btn-add {
+      width: 100%; background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+      color: #fff; border: none; border-radius: var(--radius-sm);
+      padding: 16px; font-size: 16px; font-weight: 700;
+      font-family: inherit; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(124,58,237,0.35);
+    }
+
+    /* ============================================
+       PROFILE TAB
+    ============================================ */
+    .profile-hero {
+      background: linear-gradient(145deg, #5B21B6, #7C3AED);
+      padding: 32px 20px 48px;
+      text-align: center;
+    }
+    .profile-avatar {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin: 0 auto 12px;
+      border: 3px solid rgba(255,255,255,0.4);
+    }
+    .profile-name { font-size: 20px; font-weight: 700; color: #fff; }
+    .profile-email { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+
+    .profile-card {
+      background: #fff; border-radius: var(--radius);
+      margin: 16px; padding: 4px 0;
+      box-shadow: var(--shadow);
+    }
+    .profile-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .profile-row:last-child { border-bottom: none; }
+    .profile-row-icon { font-size: 22px; width: 28px; }
+    .profile-row-text { flex: 1; font-size: 15px; font-weight: 500; }
+    .profile-row-arrow { color: var(--text-2); font-size: 18px; }
+
+    .btn-logout {
+      display: block; width: calc(100% - 32px); margin: 0 16px 32px;
+      background: #FEF2F2; color: var(--red);
+      border: none; border-radius: var(--radius-sm); padding: 14px;
+      font-size: 15px; font-weight: 600; font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* ============================================
+       TOAST
+    ============================================ */
+    .toast {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--text); color: #fff; padding: 12px 24px;
+      border-radius: 100px; font-size: 14px; font-weight: 500;
+      z-index: 9999; opacity: 0; pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ============================================
+       LOADING
+    ============================================ */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border); border-top-color: var(--purple);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================
+       SPLASH SCREEN
+  ============================================ -->
+  <div class="screen active" id="screen-splash">
+    <div class="splash-art">
+      <div class="splash-art-inner">💰</div>
+    </div>
+    <h1 class="splash-title">Save your money with<br>Expense Tracker</h1>
+    <p class="splash-sub">Save money! The more your money works for you, the less you have to work for money.</p>
+    <button class="btn-primary" onclick="App.showAuth()">Let's start</button>
+  </div>
+
+  <!-- ============================================
+       AUTH SCREEN
+  ============================================ -->
+  <div class="screen" id="screen-auth">
+    <div class="auth-header">
+      <div class="auth-icon">💳</div>
+      <h2 class="auth-title" id="auth-title">Save your money with<br>Expense Tracker</h2>
+      <p class="auth-sub">Please enter your details</p>
+    </div>
+    <div class="auth-body">
+      <button class="btn-telegram" onclick="App.telegramLogin()">
+        <span>✈️</span> Login with Telegram
+      </button>
+      <div class="divider">or</div>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="input-group">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com" />
+        <span class="input-icon">📧</span>
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" />
+        <span class="input-icon" onclick="App.togglePassword()">👁️</span>
+      </div>
+      <div class="auth-row">
+        <label><input type="checkbox" id="auth-remember" /> Remember me</label>
+        <a href="#">Forgot password?</a>
+      </div>
+      <button class="btn-auth" id="auth-submit" onclick="App.handleAuth()">Log in</button>
+      <div class="auth-switch" id="auth-switch">
+        Don't have an account? <a onclick="App.toggleAuthMode()">Sign Up</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       MAIN SCREEN
+  ============================================ -->
+  <div class="screen" id="screen-main">
+    <div class="main-content" id="main-content">
+
+      <!-- HOME TAB -->
+      <div class="tab-panel active" id="tab-home">
+        <div class="home-hero">
+          <p class="hero-label">Total Balance ↓</p>
+          <h1 class="hero-balance" id="hero-balance">$0.00</h1>
+          <div class="hero-chips">
+            <div class="hero-chip chip-income">
+              <div class="hero-chip-icon">📈</div>
+              <div>
+                <div class="hero-chip-label">Income</div>
+                <div class="hero-chip-value" id="hero-income">$0.00</div>
+              </div>
+            </div>
+            <div class="hero-chip chip-expense">
+              <div class="hero-chip-icon">📉</div>
+              <div>
+                <div class="hero-chip-label">Expenses</div>
+                <div class="hero-chip-value" id="hero-expense">$0.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">Transactions</span>
+            <span class="section-link" onclick="App.switchTab('overview')">See all</span>
+          </div>
+          <div class="tx-list" id="home-tx-list">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div class="tab-panel" id="tab-overview">
+        <div class="overview-header">
+          <h2 class="overview-title">Overview</h2>
+          <div class="overview-chips">
+            <div class="ov-chip">
+              <div class="ov-chip-label">Total Income</div>
+              <div class="ov-chip-val" id="ov-income">$0.00</div>
+            </div>
+            <div class="ov-chip">
+              <div class="ov-chip-label">Total Expenses</div>
+              <div class="ov-chip-val orange" id="ov-expense">$0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-section">
+          <div class="stats-header">
+            <span class="stats-title">Statistics</span>
+            <div class="month-selector" onclick="App.changeMonth()">
+              <span id="month-label">Monthly</span> ▾
+            </div>
+          </div>
+
+          <div class="bar-chart">
+            <div class="chart-bars" id="chart-bars"></div>
+            <div class="chart-labels" id="chart-labels"></div>
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--purple-light)"></div> Income</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> Expense</div>
+            </div>
+          </div>
+
+          <div class="toggle-tabs" id="ov-toggle">
+            <div class="toggle-tab active" onclick="App.filterOverview('income', this)">Income</div>
+            <div class="toggle-tab" onclick="App.filterOverview('expense', this)">Expenses</div>
+          </div>
+
+          <div class="tx-list" id="ov-tx-list">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE TAB -->
+      <div class="tab-panel" id="tab-profile">
+        <div class="profile-hero">
+          <div class="profile-avatar" id="profile-avatar">👤</div>
+          <div class="profile-name" id="profile-name">User</div>
+          <div class="profile-email" id="profile-email">-</div>
+        </div>
+        <div class="profile-card">
+          <div class="profile-row">
+            <span class="profile-row-icon">💼</span>
+            <span class="profile-row-text">Budget Settings</span>
+            <span class="profile-row-arrow">›</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-row-icon">🏷️</span>
+            <span class="profile-row-text">Categories</span>
+            <span class="profile-row-arrow">›</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-row-icon">💱</span>
+            <span class="profile-row-text">Currency: USD</span>
+            <span class="profile-row-arrow">›</span>
+          </div>
+          <div class="profile-row">
+            <span class="profile-row-icon">🔔</span>
+            <span class="profile-row-text">Notifications</span>
+            <span class="profile-row-arrow">›</span>
+          </div>
+        </div>
+        <button class="btn-logout" onclick="App.logout()">Log Out</button>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+      <div class="nav-item active" id="nav-home" onclick="App.switchTab('home')">
+        <span class="nav-icon">🏠</span>
+        <span>Home</span>
+      </div>
+      <div class="nav-item" id="nav-overview" onclick="App.switchTab('overview')">
+        <span class="nav-icon">📊</span>
+        <span>Overview</span>
+      </div>
+      <div class="fab" onclick="App.openAddModal()">＋</div>
+      <div class="nav-item" id="nav-profile" onclick="App.switchTab('profile')">
+        <span class="nav-icon">👤</span>
+        <span>Profile</span>
+      </div>
+      <div class="nav-item" id="nav-settings" onclick="App.switchTab('settings')">
+        <span class="nav-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ============================================
+       ADD EXPENSE MODAL
+  ============================================ -->
+  <div class="modal-overlay" id="modal-add" onclick="App.closeModalOutside(event)">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Add Transaction</h3>
+
+      <div class="type-toggle">
+        <div class="type-btn active-income" id="type-income" onclick="App.setType('income')">Income</div>
+        <div class="type-btn" id="type-expense" onclick="App.setType('expense')">Expense</div>
+      </div>
+
+      <div class="amount-input-wrap">
+        <div class="amount-input-label">Amount</div>
+        <input class="amount-input" type="number" id="add-amount" placeholder="0.00" inputmode="decimal" />
+      </div>
+
+      <select class="add-select" id="add-category">
+        <option value="">Select category...</option>
+      </select>
+
+      <input class="add-input" type="text" id="add-comment" placeholder="Add comment..." />
+
+      <div class="payment-btns">
+        <div class="payment-btn active" id="pay-cash" onclick="App.setPayment('cash', this)">
+          <span class="p-icon">💵</span> Cash
+        </div>
+        <div class="payment-btn" id="pay-card" onclick="App.setPayment('card', this)">
+          <span class="p-icon">💳</span> Card
+        </div>
+        <div class="payment-btn" id="pay-crypto" onclick="App.setPayment('crypto', this)">
+          <span class="p-icon">₿</span> Crypto
+        </div>
+      </div>
+
+      <button class="btn-add" onclick="App.submitTransaction()">Add Transaction</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<!-- Services -->
+<script src="src/services/services.js"></script>
+
+<script>
+// ============================================
+// APP CONTROLLER
+// ============================================
+const App = (() => {
+  let state = {
+    user: null,
+    transactions: [],
+    categories: [],
+    activeTab: 'home',
+    authMode: 'login', // login | register
+    ovFilter: 'income',
+    currentMonth: null,
+    addType: 'income',
+    addPayment: 'cash',
+  };
+
+  const api = ApiService.getInstance();
+  const bus = EventBus.getInstance();
+  const log = Logger.getInstance();
+
+  // ——— INIT ———
+  async function init() {
+    // Telegram WebApp setup
+    if (window.Telegram?.WebApp) {
+      Telegram.WebApp.ready();
+      Telegram.WebApp.expand();
+    }
+
+    // Auto-login from stored token
+    const saved = localStorage.getItem('et_user');
+    if (saved && api.token) {
+      try {
+        state.user = JSON.parse(saved);
+        showMain();
+        loadData();
+        return;
+      } catch(_) {}
+    }
+    showScreen('screen-splash');
+  }
+
+  // ——— SCREENS ———
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id)?.classList.add('active');
+  }
+
+  function showAuth() { showScreen('screen-auth'); }
+
+  function showMain() {
+    showScreen('screen-main');
+    updateProfileUI();
+  }
+
+  // ——— AUTH ———
+  function toggleAuthMode() {
+    state.authMode = state.authMode === 'login' ? 'register' : 'login';
+    const isReg = state.authMode === 'register';
+    document.getElementById('auth-submit').textContent = isReg ? 'Sign Up' : 'Log in';
+    document.getElementById('auth-switch').innerHTML = isReg
+      ? 'Already have an account? <a onclick="App.toggleAuthMode()">Log in</a>'
+      : "Don't have an account? <a onclick=\"App.toggleAuthMode()\">Sign Up</a>";
+    document.getElementById('auth-title').textContent = isReg ? 'Create Account' : 'Save your money with\nExpense Tracker';
+    clearAuthError();
+  }
+
+  function togglePassword() {
+    const inp = document.getElementById('auth-password');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('auth-error');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  function clearAuthError() {
+    document.getElementById('auth-error').style.display = 'none';
+  }
+
+  async function handleAuth() {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    if (!email || !password) { showAuthError('Please fill all fields'); return; }
+    const btn = document.getElementById('auth-submit');
+    btn.textContent = '...'; btn.disabled = true;
+    try {
+      let res;
+      if (state.authMode === 'register') {
+        res = await api.register(email, password);
+      } else {
+        res = await api.login(email, password);
+      }
+      api.setToken(res.access_token);
+      state.user = res.user;
+      localStorage.setItem('et_user', JSON.stringify(res.user));
+      showMain();
+      loadData();
+    } catch(e) {
+      showAuthError(e.message || 'Auth failed');
+    } finally {
+      btn.textContent = state.authMode === 'login' ? 'Log in' : 'Sign Up';
+      btn.disabled = false;
+    }
+  }
+
+  async function telegramLogin() {
+    if (window.Telegram?.WebApp?.initData) {
+      try {
+        const res = await api.telegramAuth(Telegram.WebApp.initData);
+        api.setToken(res.access_token);
+        state.user = res.user;
+        localStorage.setItem('et_user', JSON.stringify(res.user));
+        showMain();
+        loadData();
+      } catch(e) {
+        showAuthError('Telegram auth failed: ' + e.message);
+      }
+    } else {
+      showToast('Open in Telegram to use this feature');
+    }
+  }
+
+  function logout() {
+    api.clearToken();
+    state.user = null;
+    state.transactions = [];
+    showScreen('screen-auth');
+  }
+
+  // ——— DATA LOADING ———
+  async function loadData() {
+    try {
+      const [txData, cats] = await Promise.all([
+        api.getTransactions({ limit: 50 }),
+        api.getCategories(),
+      ]);
+      state.transactions = txData?.items || [];
+      state.categories = cats || [];
+      renderHome();
+      renderCategorySelect();
+    } catch(e) {
+      log.error('loadData failed', e.message);
+      showToast('Failed to load data');
+    }
+  }
+
+  // ——— HOME ———
+  function renderHome() {
+    const txs = state.transactions;
+    const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+    const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+    const balance = income - expense;
+
+    document.getElementById('hero-balance').textContent = formatMoney(balance);
+    document.getElementById('hero-income').textContent = formatMoney(income);
+    document.getElementById('hero-expense').textContent = formatMoney(expense);
+
+    const list = document.getElementById('home-tx-list');
+    const recent = txs.slice(0, 8);
+    list.innerHTML = recent.length ? recent.map(renderTxItem).join('') : emptyState('No transactions yet');
+
+    // Observer: notify overview too
+    bus.emit('stats.updated', { income, expense, balance, transactions: txs });
+  }
+
+  function renderTxItem(tx) {
+    const cat = tx.category;
+    const icon = cat?.icon || '💳';
+    const color = cat?.color || '#7C3AED';
+    const bg = color + '22';
+    const sign = tx.type === 'income' ? '+' : '-';
+    const cls = tx.type === 'income' ? 'income' : 'expense';
+    const time = tx.transaction_date ? new Date(tx.transaction_date).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `
+      <div class="tx-item" onclick="App.txDetail('${tx.id}')">
+        <div class="tx-icon" style="background:${bg}">${icon}</div>
+        <div class="tx-info">
+          <div class="tx-name">${cat?.name || tx.comment || 'Transaction'}</div>
+          <div class="tx-time">${time}</div>
+        </div>
+        <div class="tx-amount ${cls}">${sign}${formatMoney(tx.amount)}</div>
+      </div>`;
+  }
+
+  function emptyState(msg) {
+    return `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">${msg}</div></div>`;
+  }
+
+  function txDetail(id) {
+    const tx = state.transactions.find(t => t.id === id);
+    if (!tx) return;
+    const sign = tx.type === 'income' ? '+' : '-';
+    const msg = `${tx.category?.name || 'Transaction'}: ${sign}$${parseFloat(tx.amount).toFixed(2)}\n${tx.comment || ''}`;
+    if (confirm(msg + '\n\nDelete this transaction?')) {
+      deleteTransaction(id);
+    }
+  }
+
+  async function deleteTransaction(id) {
+    try {
+      await api.deleteTransaction(id);
+      state.transactions = state.transactions.filter(t => t.id !== id);
+      renderHome();
+      showToast('Transaction deleted');
+    } catch(e) {
+      showToast('Delete failed');
+    }
+  }
+
+  // ——— OVERVIEW ———
+  bus.on('stats.updated', (data) => {
+    document.getElementById('ov-income').textContent = formatMoney(data.income);
+    document.getElementById('ov-expense').textContent = formatMoney(data.expense);
+    renderChart(data.transactions);
+    renderOvList(state.ovFilter);
+  });
+
+  function renderChart(txs) {
+    const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    const wIncome = [0, 0, 0, 0], wExpense = [0, 0, 0, 0];
+    txs.forEach(tx => {
+      const d = new Date(tx.transaction_date || Date.now());
+      const week = Math.min(Math.floor((d.getDate() - 1) / 7), 3);
+      if (tx.type === 'income') wIncome[week] += parseFloat(tx.amount);
+      else wExpense[week] += parseFloat(tx.amount);
+    });
+    const max = Math.max(...wIncome, ...wExpense, 1);
+    const bars = document.getElementById('chart-bars');
+    const labels = document.getElementById('chart-labels');
+    bars.innerHTML = weeks.map((_, i) => `
+      <div class="chart-bar-group">
+        <div class="chart-bar bar-income" style="height:${(wIncome[i]/max*110)+4}px"></div>
+        <div class="chart-bar bar-expense" style="height:${(wExpense[i]/max*110)+4}px"></div>
+      </div>`).join('');
+    labels.innerHTML = weeks.map(w => `<div class="chart-label">${w}</div>`).join('');
+  }
+
+  function filterOverview(type, el) {
+    state.ovFilter = type;
+    document.querySelectorAll('#ov-toggle .toggle-tab').forEach(t => t.classList.remove('active', 'active-orange'));
+    el.classList.add(type === 'income' ? 'active' : 'active-orange');
+    renderOvList(type);
+  }
+
+  function renderOvList(type) {
+    const filtered = state.transactions.filter(t => t.type === type);
+    const list = document.getElementById('ov-tx-list');
+    list.innerHTML = filtered.length ? filtered.map(renderTxItem).join('') : emptyState(`No ${type} transactions`);
+  }
+
+  function changeMonth() {
+    showToast('Month picker coming soon');
+  }
+
+  // ——— TABS ———
+  function switchTab(tab) {
+    state.activeTab = tab;
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(`tab-${tab}`)?.classList.add('active');
+    document.getElementById(`nav-${tab}`)?.classList.add('active');
+
+    if (tab === 'overview') {
+      renderOvList(state.ovFilter);
+      renderChart(state.transactions);
+    }
+  }
+
+  // ——— ADD MODAL ———
+  function openAddModal() {
+    loadCategories();
+    document.getElementById('modal-add').classList.add('open');
+    document.getElementById('add-amount').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('modal-add').classList.remove('open');
+    document.getElementById('add-amount').value = '';
+    document.getElementById('add-comment').value = '';
+    document.getElementById('add-category').value = '';
+  }
+
+  function closeModalOutside(e) {
+    if (e.target === document.getElementById('modal-add')) closeModal();
+  }
+
+  function setType(type) {
+    state.addType = type;
+    document.getElementById('type-income').className = 'type-btn' + (type === 'income' ? ' active-income' : '');
+    document.getElementById('type-expense').className = 'type-btn' + (type === 'expense' ? ' active-expense' : '');
+  }
+
+  function setPayment(method, el) {
+    state.addPayment = method;
+    document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  async function loadCategories() {
+    if (state.categories.length) {
+      renderCategorySelect();
+      return;
+    }
+    try {
+      state.categories = await api.getCategories();
+      renderCategorySelect();
+    } catch(_) {}
+  }
+
+  function renderCategorySelect() {
+    const sel = document.getElementById('add-category');
+    const type = state.addType;
+    const filtered = state.categories.filter(c => c.type === type || c.type === 'both');
+    sel.innerHTML = `<option value="">Select category...</option>` +
+      filtered.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+  }
+
+  async function submitTransaction() {
+    const amount = parseFloat(document.getElementById('add-amount').value);
+    if (!amount || amount <= 0) { showToast('Enter a valid amount'); return; }
+
+    try {
+      const builder = new ExpenseBuilder()
+        .setType(state.addType)
+        .setAmount(amount)
+        .setCategory(document.getElementById('add-category').value || null)
+        .setComment(document.getElementById('add-comment').value || null)
+        .setPaymentMethod(state.addPayment);
+
+      const data = builder.build();
+      const tx = await api.createTransaction(data);
+
+      state.transactions.unshift(tx);
+      renderHome();
+      closeModal();
+      showToast(`${state.addType === 'income' ? '+' : '-'}$${amount.toFixed(2)} added!`);
+
+      // Observer
+      bus.emit('transaction.added', tx);
+    } catch(e) {
+      showToast(e.message || 'Failed to add transaction');
+    }
+  }
+
+  // ——— PROFILE ———
+  function updateProfileUI() {
+    if (!state.user) return;
+    const u = state.user;
+    document.getElementById('profile-name').textContent =
+      u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : u.username || 'User';
+    document.getElementById('profile-email').textContent = u.email || `@${u.username || ''}`;
+    if (u.first_name) {
+      document.getElementById('profile-avatar').textContent = u.first_name[0].toUpperCase();
+    }
+  }
+
+  // ——— UTILS ———
+  function formatMoney(n) {
+    const num = parseFloat(n) || 0;
+    return '$' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ——— EXPOSE ———
+  return {
+    init, showAuth, toggleAuthMode, togglePassword,
+    handleAuth, telegramLogin, logout,
+    switchTab, openAddModal, closeModalOutside,
+    setType, setPayment, submitTransaction,
+    filterOverview, changeMonth,
+    txDetail,
+  };
+})();
+
+// Boot
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+</body>
+</html>

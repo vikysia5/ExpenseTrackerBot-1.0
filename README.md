@@ -1,206 +1,249 @@
-# 💸 Expense Tracker — Telegram Mini App
+# 💰 Expense Tracker — Telegram Mini App
 
-> Повноцінний трекер витрат як Telegram Mini App.  
-> Реалізує всі патерни з **Модуля 2** (архітектура, REST API, БД) та **Модуля 3** (ПР-8 до ПР-12).
-
----
-
-## 🏗 Архітектура (Модуль 2)
-
-```
-Layered Architecture + MVC
-├── Presentation Layer  → src/routes/api.js
-├── Business Logic      → src/services/expenseService.js, userService.js
-├── Data Access         → src/core/database.js (Supabase)
-└── External Services   → Telegram WebApp API
-```
-
-## ✅ Патерни (Модуль 3)
-
-| ПР | Що реалізовано |
-|----|----------------|
-| **ПР-8** | Singleton (Logger, AppConfig, Database), Factory (NotificationFactory, ResponseFactory, SortStrategyFactory), Builder (ExpenseBuilder) |
-| **ПР-9** | Observer (EventBus + 3 observers), Strategy (4 sort strategies + FilterStrategies + ReportStrategies), Decorator (timer, cache, retry, withRetry) |
-| **ПР-10** | Ієрархія виключень (AppError → ValidationError/BusinessError/DatabaseError), структуровані JSON-логи, валідатор ExpenseValidator |
-| **ПР-11** | Рефакторинг: без magic numbers, Extract Function, константи, SRP у всіх класах |
-| **ПР-12** | async/await скрізь, `Promise.allSettled` (гарантована паралельність), `runBackground` (фонові задачі), retry decorator |
+Full-stack Telegram Mini App for expense tracking.
+**Stack**: FastAPI + Supabase + Vanilla JS + Railway
 
 ---
 
-## 🚀 РОЗГОРТАННЯ (сьогодні, за 20 хвилин)
-
-### Крок 1 — Supabase (безкоштовна БД)
-
-1. Йти на **https://supabase.com** → **Start your project** → Sign in with GitHub
-2. **New project** → назвати `expense-tracker` → вибрати region (EU West) → Create
-3. Зачекати ~2 хвилини поки БД запуститься
-4. Зліва: **SQL Editor** → вставити весь вміст файлу `docs/schema.sql` → **Run**
-5. Зліва: **Project Settings** → **API**:
-   - Скопіювати **Project URL** (виглядає як `https://xxxx.supabase.co`)
-   - Скопіювати **anon public** key
-
-### Крок 2 — Telegram Bot
-
-1. Написати **@BotFather** у Telegram
-2. `/newbot` → ввести назву (напр. `My Expense Tracker`) → ввести username (напр. `my_expense_tracker_bot`)
-3. Скопіювати **token** (виглядає як `1234567890:AAHxxxxxxx`)
-4. `/newapp` → вибрати бота → ввести назву → Web App URL можна поки вказати `https://example.com` (змінимо після деплою)
-
-### Крок 3 — Railway (безкоштовний хостинг)
-
-1. Йти на **https://railway.app** → Sign in with GitHub
-2. **New Project** → **Deploy from GitHub repo**
-3. Підключити GitHub і вибрати репозиторій з цим кодом
-   - Якщо немає репо: **New Project** → **Empty Project** → потім додати через CLI
-
-#### Якщо через CLI (рекомендовано):
-```bash
-# Встановити Railway CLI
-npm install -g @railway/cli
-
-# Логін
-railway login
-
-# В папці з проєктом:
-cd expense-tracker
-railway init
-railway up
-```
-
-4. У Railway dashboard → вибрати сервіс → **Variables** → додати:
-
-```
-BOT_TOKEN=ваш_токен_від_botfather
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=ваш_anon_key
-NODE_ENV=production
-PORT=3000
-```
-
-5. **Deploy** → зачекати ~1 хвилину
-6. Скопіювати URL сервісу (напр. `https://expense-tracker-production.up.railway.app`)
-
-### Крок 4 — Підключити Mini App до бота
-
-1. Написати **@BotFather**
-2. `/mybots` → вибрати бота → **Bot Settings** → **Menu Button** → вказати URL з Railway
-3. Або використати inline кнопку:
-```
-/setmenubutton
-```
-Вказати URL: `https://your-app.up.railway.app`
-
-### Крок 5 — Тестування
-
-1. Відкрити бота в Telegram
-2. Натиснути кнопку меню (або `/start`)
-3. Має відкритись Mini App! 🎉
-
----
-
-## 🔧 Локальний запуск (розробка)
-
-```bash
-# 1. Клонувати/розпакувати проєкт
-cd expense-tracker
-
-# 2. Встановити залежності
-npm install
-
-# 3. Створити .env файл
-cp .env.example .env
-# Відредагувати .env — вставити свої значення
-
-# 4. Запустити
-npm run dev
-# або
-node src/index.js
-
-# 5. Відкрити в браузері
-open http://localhost:3000
-```
-
-**Без Supabase (mock режим):** якщо `.env` не має Supabase credentials — автоматично використовується in-memory mock. Дані зберігаються до рестарту сервера.
-
----
-
-## 📁 Структура проєкту
+## 🏗️ Architecture
 
 ```
 expense-tracker/
-├── src/
-│   ├── index.js                    # Entry point (Express server)
-│   ├── core/
-│   │   ├── config.js               # Singleton: AppConfig
-│   │   ├── database.js             # Singleton: Supabase client
-│   │   ├── logger.js               # Singleton: structured logger (ПР-10)
-│   │   ├── decorators.js           # timer, cache, retry (ПР-9, ПР-12)
-│   │   └── exceptions.js           # Exception hierarchy (ПР-10)
-│   ├── services/
-│   │   ├── expenseService.js       # Business logic (SRP, DIP)
-│   │   └── userService.js          # User management
-│   ├── routes/
-│   │   └── api.js                  # REST API endpoints (ПР-5)
-│   ├── observers/
-│   │   └── eventBus.js             # Observer pattern (ПР-9)
-│   ├── strategies/
-│   │   └── sortStrategy.js         # Strategy pattern (ПР-9)
-│   ├── patterns/
-│   │   └── builders.js             # Factory + Builder (ПР-8)
-│   └── validators/
-│       └── expenseValidator.js     # Input validation (ПР-10)
-├── public/
-│   └── index.html                  # Telegram Mini App (all JS patterns)
-├── docs/
-│   └── schema.sql                  # Database schema (ПР-6)
-├── .env.example
-├── railway.json
-└── package.json
+├── backend/                    # FastAPI REST API
+│   ├── main.py                 # App entrypoint
+│   ├── requirements.txt
+│   ├── railway.toml
+│   └── src/
+│       ├── core/
+│       │   ├── config.py       # Singleton: AppConfig
+│       │   ├── logger.py       # Singleton: Logger
+│       │   ├── database.py     # Supabase client
+│       │   └── security.py     # JWT + Telegram auth
+│       ├── models/
+│       │   └── schemas.py      # Pydantic models
+│       ├── repositories/
+│       │   └── repositories.py # Data Access Layer
+│       ├── services/
+│       │   └── services.py     # Business Logic + Facade
+│       ├── api/
+│       │   └── routers.py      # REST endpoints
+│       └── patterns/
+│           └── patterns.py     # Design Patterns
+│
+├── frontend/                   # Telegram WebApp
+│   ├── index.html              # Single-page app
+│   ├── server.py               # Static file server
+│   ├── railway.toml
+│   └── src/
+│       └── services/
+│           └── services.js     # ApiService, EventBus, Builder, Strategy
+│
+└── sql/
+    └── schema.sql              # Supabase schema (run this first!)
 ```
 
 ---
 
-## 🎯 REST API (Модуль 2, ПР-5)
+## 🎨 Design Patterns Implemented
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/me` | Current user info |
-| PATCH | `/api/me` | Update settings |
-| GET | `/api/expenses` | Get expenses (with sort/filter) |
-| POST | `/api/expenses` | Create expense |
-| DELETE | `/api/expenses/:id` | Delete expense |
-| GET | `/api/report` | Get spending report |
-| GET | `/api/categories` | Get category list |
+| Pattern | Where | Purpose |
+|---------|-------|---------|
+| **Singleton** | `AppConfig`, `Logger`, `ApiService`, `EventBus` | Single instances |
+| **Factory Method** | `PaymentFactory`, `NotifierFactory` | Create processors by type |
+| **Builder** | `ExpenseBuilder` | Step-by-step transaction creation |
+| **Observer** | `EventBus` | UI updates on transaction events |
+| **Strategy** | `TransactionSorter` | Pluggable sort algorithms |
+| **Facade** | `TransactionFacade` | Unified create/notify/log interface |
 
 ---
 
-## 🧑‍💻 Multi-user support
+## 🚀 Deployment on Railway (Free Tier)
 
-Кожен Telegram користувач ідентифікується через `telegram_id` з `initData`.  
-- Supabase Row Level Security ізолює дані між юзерами
-- На бекенді: `user_id` прив'язується до кожного запиту через middleware
-- Одночасно підтримується **необмежена кількість** користувачів
+### Step 1 — Setup Supabase
+
+1. Go to [supabase.com](https://supabase.com) → New Project (free)
+2. Go to **SQL Editor** → paste contents of `sql/schema.sql` → Run
+3. Go to **Settings → API** → copy:
+   - `Project URL` → `SUPABASE_URL`
+   - `anon public` key → `SUPABASE_KEY`
+   - `service_role` key → `SUPABASE_SERVICE_KEY`
+
+### Step 2 — Deploy Backend on Railway
+
+1. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Select your repo, set **root directory** to `backend/`
+3. Add Environment Variables:
+   ```
+   SUPABASE_URL=https://xxx.supabase.co
+   SUPABASE_KEY=your-anon-key
+   SUPABASE_SERVICE_KEY=your-service-role-key
+   JWT_SECRET=some-random-long-string-change-this
+   TELEGRAM_BOT_TOKEN=your-bot-token
+   ```
+4. Railway will auto-detect `requirements.txt` and deploy
+5. Copy your Railway backend URL: `https://backend-xxx.railway.app`
+
+### Step 3 — Deploy Frontend on Railway
+
+1. New Service → GitHub → root directory `frontend/`
+2. Add Environment Variable:
+   ```
+   PORT=3000
+   ```
+3. Edit `frontend/index.html` line with `window.ENV_API_URL`:
+   Change to your backend URL:
+   ```js
+   this.baseURL = 'https://your-backend.railway.app/api/v1';
+   ```
+4. Deploy and copy frontend URL: `https://frontend-xxx.railway.app`
+
+### Step 4 — Setup Telegram Bot
+
+```bash
+# 1. Message @BotFather on Telegram
+# 2. /newbot → name it → get token
+# 3. /setmenubutton → select your bot → set URL to your frontend URL
+# 4. Enable Mini App:
+#    /newapp → select bot → set URL to frontend
+```
 
 ---
 
-## 📚 Патерни — де знайти в коді
+## 📡 API Reference
+
+### Authentication
+```
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/telegram
+GET  /api/v1/auth/me
+```
+
+### Transactions
+```
+GET    /api/v1/expenses              # List with filters
+POST   /api/v1/expenses              # Create
+GET    /api/v1/expenses/{id}         # Get by ID
+PUT    /api/v1/expenses/{id}         # Update
+DELETE /api/v1/expenses/{id}         # Delete
+GET    /api/v1/expenses/stats        # Statistics
+```
+
+### Categories
+```
+GET    /api/v1/categories
+POST   /api/v1/categories
+PUT    /api/v1/categories/{id}
+DELETE /api/v1/categories/{id}
+```
+
+### Query Parameters for GET /expenses
+| Param | Values | Description |
+|-------|--------|-------------|
+| `type` | income, expense | Filter by type |
+| `category_id` | UUID | Filter by category |
+| `month` | YYYY-MM | Filter by month |
+| `sort_by` | date, amount, category | Sort strategy |
+| `limit` | 1-200 | Page size |
+| `offset` | number | Pagination |
+
+---
+
+## 🧪 Example API Requests
+
+```bash
+# Register
+curl -X POST https://your-api.railway.app/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"123456"}'
+
+# Login
+curl -X POST https://your-api.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"123456"}'
+
+# Create expense (use token from login)
+curl -X POST https://your-api.railway.app/api/v1/expenses \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "expense",
+    "amount": 45.50,
+    "currency": "USD",
+    "comment": "Lunch",
+    "payment_method": "card"
+  }'
+
+# Get all transactions
+curl https://your-api.railway.app/api/v1/expenses \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get stats for April 2024
+curl "https://your-api.railway.app/api/v1/expenses/stats?month=2024-04" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# View API docs
+open https://your-api.railway.app/docs
+```
+
+---
+
+## 🏠 Local Development
+
+```bash
+# Backend
+cd backend
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env              # Fill in your values
+python main.py                    # Runs on http://localhost:8000
+
+# Frontend
+cd frontend
+python -m http.server 3000        # Runs on http://localhost:3000
+# Or just open index.html in browser
+```
+
+---
+
+## 📱 Screens
+
+| Screen | Description |
+|--------|-------------|
+| **Splash** | Animated intro with "Let's start" |
+| **Auth** | Email/password login + Telegram SSO |
+| **Home** | Balance card, income/expense chips, transaction list |
+| **Overview** | Statistics chart, income vs expenses toggle, filtered list |
+| **Add** | Bottom sheet: amount, category, comment, payment method |
+| **Profile** | User info, settings rows, logout |
+
+---
+
+## 🔐 HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200 | OK |
+| 201 | Created |
+| 204 | No Content (delete) |
+| 401 | Unauthorized |
+| 404 | Not Found |
+| 422 | Validation Error |
+| 500 | Internal Server Error |
+
+---
+
+## 📊 Database Schema (ER)
 
 ```
-SINGLETON   → src/core/logger.js, config.js, database.js
-FACTORY     → src/patterns/builders.js (NotificationFactory, ResponseFactory)
-             → src/strategies/sortStrategy.js (SortStrategyFactory)
-BUILDER     → src/patterns/builders.js (ExpenseBuilder)
-             → public/index.html (ExpenseBuilder — frontend)
-OBSERVER    → src/observers/eventBus.js (EventBus + 3 concrete observers)
-             → public/index.html (EventBus + 3 observers — frontend)
-STRATEGY    → src/strategies/sortStrategy.js (4 sort + 3 filter + 2 report strategies)
-             → public/index.html (SortStrategies, FilterStrategies — frontend)
-DECORATOR   → src/core/decorators.js (timer, cache, retry)
-             → public/index.html (withTimer, withRetry — frontend)
-ASYNC/AWAIT → src/services/expenseService.js (gatherSafe parallel fetch)
-             → public/index.html (Promise.allSettled, async init)
-EXCEPTIONS  → src/core/exceptions.js (AppError hierarchy)
-VALIDATION  → src/validators/expenseValidator.js
-LOGGING     → src/core/logger.js (JSON + text format, all levels)
+users ──────────────────────────────────────────────────────┐
+  │                                                          │
+  ├── transactions (1:N) ──── categories (1:N transactions)  │
+  │         │                                                │
+  │         └── expense_tags (M:N) ──── tags                │
+  │                                                          │
+  ├── budgets (1:N)                                          │
+  ├── user_settings (1:1)                                    │
+  └── categories (1:N, user-defined)                        │
 ```
