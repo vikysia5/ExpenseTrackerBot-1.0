@@ -7,7 +7,8 @@ class ApiService {
 
   constructor() {
     if (ApiService._instance) return ApiService._instance;
-    this.baseURL = 'https://expensetrackerbot-10-production.up.railway.app/api/v1';    this.token = localStorage.getItem('et_token');
+    this.baseURL = 'https://expensetrackerbot-10-production.up.railway.app/api/v1';    
+    this.token = localStorage.getItem('et_token');
     ApiService._instance = this;
   }
 
