@@ -57,9 +57,9 @@ async def telegram_auth(data: TelegramAuth):
         logger.error("Unexpected error in telegram auth", error=str(e), type=type(e).__name__)
         raise HTTPException(status_code=401, detail=f"Telegram auth error: {e}")
     
-    user = await auth_service.telegram_login(user_data)
-    logger.info("Telegram auth success", user_id=user.get("id"))
-    return user
+    result = await auth_service.telegram_login(user_data)
+    logger.info("Telegram auth success", user_id=result.get("user", {}).get("id"))
+    return result
 
 
 @auth_router.get("/me")

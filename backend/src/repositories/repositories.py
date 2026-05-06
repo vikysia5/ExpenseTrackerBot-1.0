@@ -147,8 +147,13 @@ class UserRepository:
         self.table = "users"
 
     async def create(self, data: dict) -> dict:
-        result = self.db.table(self.table).insert(data).execute()
-        return result.data[0]
+        result = self.db.table(self.table).insert(data).select("*").execute()
+        if result.error:
+            logger.error("Failed to create user", error=result.error)
+            raise Exception(result.error)
+        user = result.data[0] if result.data else None
+        logger.info("User create result", user_id=user.get("id") if user else None, data=list(data.keys()))
+        return user
 
     async def get_by_email(self, email: str) -> Optional[dict]:
         result = self.db.table(self.table).select("*").eq("email", email).execute()
