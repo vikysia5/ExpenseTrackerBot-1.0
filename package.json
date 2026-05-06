@@ -2,7 +2,7 @@
   "name": "expense-tracker-tma",
   "version": "1.0.0",
   "description": "Expense Tracker Telegram Mini App",
-  "main": "public/index.html",
+  "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"
