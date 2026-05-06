@@ -54,12 +54,16 @@ async def telegram_auth(data: TelegramAuth):
         logger.error("Telegram auth verification failed", error=str(e))
         raise HTTPException(status_code=401, detail=f"Telegram auth failed: {e}")
     except Exception as e:
-        logger.error("Unexpected error in telegram auth", error=str(e), type=type(e).__name__)
+        logger.error("Unexpected error in telegram verify", error=str(e), type=type(e).__name__)
         raise HTTPException(status_code=401, detail=f"Telegram auth error: {e}")
     
-    result = await auth_service.telegram_login(user_data)
-    logger.info("Telegram auth success", user_id=result.get("user", {}).get("id"))
-    return result
+    try:
+        result = await auth_service.telegram_login(user_data)
+        logger.info("Telegram auth success", user_id=result.get("user", {}).get("id"))
+        return result
+    except Exception as e:
+        logger.error("Telegram login failed", error=str(e), type=type(e).__name__, traceback=True)
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
 
 @auth_router.get("/me")

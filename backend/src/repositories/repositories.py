@@ -168,13 +168,19 @@ class UserRepository:
         return result.data[0] if result.data else None
 
     async def upsert_telegram_user(self, telegram_data: dict) -> dict:
-        existing = await self.get_by_telegram_id(telegram_data["id"])
+        tg_id = telegram_data.get("id")
+        logger.info("upsert_telegram_user start", tg_id=tg_id)
+        
+        existing = await self.get_by_telegram_id(tg_id)
         if existing:
+            logger.info("Telegram user already exists", tg_id=tg_id, user_id=existing.get("id"))
             return existing
+        
+        logger.info("Creating new Telegram user", tg_id=tg_id)
         
         # Build user dict with telegram_id and optional fields
         user = {
-            "telegram_id": telegram_data["id"],
+            "telegram_id": tg_id,
         }
         
         # Try to add optional fields
@@ -183,12 +189,18 @@ class UserRepository:
             if field in telegram_data:
                 user[field] = telegram_data.get(field)
         
+        logger.info("User data prepared", user_keys=list(user.keys()))
+        
         try:
-            return await self.create(user)
+            result = await self.create(user)
+            logger.info("User created successfully", user_id=result.get("id") if result else None)
+            return result
         except Exception as e:
             # If error is about missing columns, create with only telegram_id
             if "PGRST204" in str(e) or "column" in str(e).lower():
                 logger.warning("Columns don't exist in schema, creating with minimal data", error=str(e))
-                user = {"telegram_id": telegram_data["id"]}
-                return await self.create(user)
+                user = {"telegram_id": tg_id}
+                result = await self.create(user)
+                return result
+            logger.error("Failed to create Telegram user", error=str(e), type=type(e).__name__)
             raise

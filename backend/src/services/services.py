@@ -50,9 +50,22 @@ class AuthService:
         return {"access_token": token, "token_type": "bearer", "user": user}
 
     async def telegram_login(self, telegram_data: dict) -> dict:
-        user = await self.user_repo.upsert_telegram_user(telegram_data)
-        token = create_access_token({"sub": user["id"], "telegram_id": telegram_data["id"]})
-        logger.info("Telegram login", user_id=user["id"], tg=telegram_data["id"])
+        logger.info("telegram_login start", tg_id=telegram_data.get("id"))
+        try:
+            user = await self.user_repo.upsert_telegram_user(telegram_data)
+            logger.info("upsert_telegram_user success", user_id=user.get("id") if user else None)
+        except Exception as e:
+            logger.error("upsert_telegram_user failed", error=str(e), type=type(e).__name__)
+            raise
+        
+        try:
+            token = create_access_token({"sub": user["id"], "telegram_id": telegram_data["id"]})
+            logger.info("Token created", user_id=user.get("id"))
+        except Exception as e:
+            logger.error("Token creation failed", error=str(e), type=type(e).__name__)
+            raise
+        
+        logger.info("Telegram login success", user_id=user.get("id"), tg=telegram_data.get("id"))
         return {"access_token": token, "token_type": "bearer", "user": user}
 
 
