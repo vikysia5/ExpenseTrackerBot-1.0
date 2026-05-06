@@ -4,6 +4,7 @@ OpenAPI 3.0 compliant
 """
 from typing import Optional
 from src.core.config import settings  # вот так
+from src.core.logger import logger
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from src.core.security import get_current_user, verify_telegram_init_data
 from src.models.schemas import (
@@ -43,15 +44,21 @@ async def telegram_auth(body: TelegramAuth):
 
 @auth_router.post("/telegram")
 async def telegram_auth(data: TelegramAuth):
+    logger.info("Telegram auth request", init_data_len=len(data.init_data) if data.init_data else 0)
     try:
         user_data = verify_telegram_init_data(
             data.init_data, 
             settings.TELEGRAM_BOT_TOKEN
         )
     except ValueError as e:
+        logger.error("Telegram auth verification failed", error=str(e))
         raise HTTPException(status_code=401, detail=f"Telegram auth failed: {e}")
+    except Exception as e:
+        logger.error("Unexpected error in telegram auth", error=str(e), type=type(e).__name__)
+        raise HTTPException(status_code=401, detail=f"Telegram auth error: {e}")
     
     user = await auth_service.telegram_login(user_data)
+    logger.info("Telegram auth success", user_id=user.get("id"))
     return user
 
 
