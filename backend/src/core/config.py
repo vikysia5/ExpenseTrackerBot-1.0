@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Telegram
-    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_TOKEN: str = "8041079563:AAGVOXvtGyPtfANevmVL0T29GGxQKzdaLCw"
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]

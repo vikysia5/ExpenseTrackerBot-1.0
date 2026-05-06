@@ -41,7 +41,7 @@ async def telegram_auth(body: TelegramAuth):
     telegram_data = verify_telegram_init_data(body.init_data)
     return await auth_service.telegram_login(telegram_data)'''
 
-@auth_router.post("/auth/telegram")
+@auth_router.post("/telegram")
 async def telegram_auth(data: TelegramAuth):
     try:
         user_data = verify_telegram_init_data(
