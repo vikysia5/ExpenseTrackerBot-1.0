@@ -17,7 +17,7 @@ from src.patterns.patterns import (
 from src.repositories.repositories import (
     TransactionRepository, CategoryRepository, UserRepository
 )
-
+from src.validators.expense_validator import ExpenseValidator 
 
 # ============================================
 # AUTH SERVICE
@@ -88,6 +88,8 @@ class TransactionFacade:
         self.tx_repo = TransactionRepository()
 
     async def create_transaction(self, user_id: str, data: TransactionCreate) -> dict:
+        ExpenseValidator.validate(data.model_dump())
+
         # 1. Build expense using Builder pattern
         builder = (
             ExpenseBuilder()
