@@ -5,7 +5,7 @@ OpenAPI 3.0 compliant
 from typing import Optional
 from src.core.config import settings  # вот так
 from src.core.logger import logger
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
 from src.core.security import get_current_user, verify_telegram_init_data
 from src.models.schemas import (
     UserCreate, UserLogin, TelegramAuth,
@@ -13,6 +13,7 @@ from src.models.schemas import (
     CategoryCreate, CategoryUpdate,
 )
 from src.services.services import AuthService, TransactionFacade, CategoryService
+from src.services.background import send_notification
 
 # ============================================
 # AUTH ROUTER
@@ -35,12 +36,6 @@ async def login(body: UserLogin):
         return await auth_service.login(body.email, body.password)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
-
-
-'''@auth_router.post("/telegram")
-async def telegram_auth(body: TelegramAuth):
-    telegram_data = verify_telegram_init_data(body.init_data)
-    return await auth_service.telegram_login(telegram_data)'''
 
 @auth_router.post("/telegram")
 async def telegram_auth(data: TelegramAuth):
@@ -101,10 +96,31 @@ async def list_transactions(
 @tx_router.post("", status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     body: TransactionCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
     try:
-        return await tx_facade.create_transaction(current_user["sub"], body)
+        # Крок 1: зберегти транзакцію
+        tx = await tx_facade.create_transaction(current_user["sub"], body)
+ 
+        # Крок 2: знайти telegram_id юзера
+        from src.repositories.repositories import UserRepository
+        user = await UserRepository().get_by_id(current_user["sub"])
+        tg_id = user.get("telegram_id") if user else None
+ 
+        # Крок 3: поставити сповіщення у фонову чергу
+        if tg_id:
+            background_tasks.add_task(
+                send_notification,
+                user_telegram_id=tg_id,
+                message=body.comment or "New transaction recorded",
+                tx_type=body.type,
+                amount=float(body.amount),
+                category=(tx.get("category") or {}).get("name"),
+            )
+ 
+        return tx
+ 
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
