@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
+from pydantic import ConfigDict
 from pydantic import BaseModel, EmailStr, Field, validator
 
 
@@ -50,8 +51,7 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuthResponse(BaseModel):
@@ -85,8 +85,7 @@ class CategoryResponse(BaseModel):
     is_default: bool
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================
@@ -124,8 +123,7 @@ class TransactionResponse(BaseModel):
     transaction_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionListResponse(BaseModel):

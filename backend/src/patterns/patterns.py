@@ -7,7 +7,7 @@ Design Patterns Implementation
 - Facade: TransactionFacade
 """
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Optional, List, Callable, Dict
 from uuid import uuid4
@@ -123,7 +123,7 @@ class ExpenseData:
         self.category_id = None
         self.comment = None
         self.payment_method = "card"
-        self.transaction_date = datetime.utcnow()
+        self.transaction_date = datetime.now(UTC)
         self.tag_ids = []
 
 

@@ -6,8 +6,7 @@ import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 from typing import Optional
-
-
+from pydantic import BaseModel, ConfigDict
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Expense Tracker API"
@@ -32,9 +31,7 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
 
 # SINGLETON via lru_cache
