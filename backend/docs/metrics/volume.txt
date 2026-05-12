@@ -1,0 +1,252 @@
+src/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/exceptions.py
+    LOC: 104
+    LLOC: 54
+    SLOC: 67
+    Comments: 5
+    Single comments: 14
+    Multi: 4
+    Blank: 19
+    - Comment Stats
+        (C % L): 5%
+        (C % S): 7%
+        (C + M % L): 9%
+src/core/config.py
+    LOC: 48
+    LLOC: 40
+    SLOC: 25
+    Comments: 8
+    Single comments: 8
+    Multi: 4
+    Blank: 11
+    - Comment Stats
+        (C % L): 17%
+        (C % S): 32%
+        (C + M % L): 25%
+src/core/database.py
+    LOC: 21
+    LLOC: 16
+    SLOC: 12
+    Comments: 0
+    Single comments: 2
+    Multi: 3
+    Blank: 4
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 14%
+src/core/security.py
+    LOC: 121
+    LLOC: 79
+    SLOC: 84
+    Comments: 5
+    Single comments: 5
+    Multi: 7
+    Blank: 25
+    - Comment Stats
+        (C % L): 4%
+        (C % S): 6%
+        (C + M % L): 10%
+src/core/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/core/logger.py
+    LOC: 58
+    LLOC: 38
+    SLOC: 38
+    Comments: 2
+    Single comments: 2
+    Multi: 4
+    Blank: 14
+    - Comment Stats
+        (C % L): 3%
+        (C % S): 5%
+        (C + M % L): 10%
+src/patterns/patterns.py
+    LOC: 258
+    LLOC: 172
+    SLOC: 171
+    Comments: 19
+    Single comments: 21
+    Multi: 8
+    Blank: 58
+    - Comment Stats
+        (C % L): 7%
+        (C % S): 11%
+        (C + M % L): 10%
+src/patterns/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/repositories/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/repositories/repositories.py
+    LOC: 210
+    LLOC: 152
+    SLOC: 163
+    Comments: 6
+    Single comments: 6
+    Multi: 4
+    Blank: 37
+    - Comment Stats
+        (C % L): 3%
+        (C % S): 4%
+        (C + M % L): 5%
+src/models/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/models/schemas.py
+    LOC: 179
+    LLOC: 205
+    SLOC: 117
+    Comments: 19
+    Single comments: 18
+    Multi: 3
+    Blank: 41
+    - Comment Stats
+        (C % L): 11%
+        (C % S): 16%
+        (C + M % L): 12%
+src/api/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/api/routers.py
+    LOC: 210
+    LLOC: 107
+    SLOC: 157
+    Comments: 13
+    Single comments: 12
+    Multi: 4
+    Blank: 37
+    - Comment Stats
+        (C % L): 6%
+        (C % S): 8%
+        (C + M % L): 8%
+src/validators/expense_validator.py
+    LOC: 103
+    LLOC: 56
+    SLOC: 71
+    Comments: 5
+    Single comments: 9
+    Multi: 9
+    Blank: 14
+    - Comment Stats
+        (C % L): 5%
+        (C % S): 7%
+        (C + M % L): 14%
+src/validators/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+src/services/services.py
+    LOC: 199
+    LLOC: 109
+    SLOC: 137
+    Comments: 16
+    Single comments: 16
+    Multi: 13
+    Blank: 33
+    - Comment Stats
+        (C % L): 8%
+        (C % S): 12%
+        (C + M % L): 15%
+src/services/background.py
+    LOC: 110
+    LLOC: 36
+    SLOC: 71
+    Comments: 6
+    Single comments: 6
+    Multi: 23
+    Blank: 10
+    - Comment Stats
+        (C % L): 5%
+        (C % S): 8%
+        (C + M % L): 26%
+src/services/__init__.py
+    LOC: 0
+    LLOC: 0
+    SLOC: 0
+    Comments: 0
+    Single comments: 0
+    Multi: 0
+    Blank: 0
+    - Comment Stats
+        (C % L): 0%
+        (C % S): 0%
+        (C + M % L): 0%
+** Total **
+    LOC: 1621
+    LLOC: 1064
+    SLOC: 1113
+    Comments: 104
+    Single comments: 119
+    Multi: 86
+    Blank: 303
+    - Comment Stats
+        (C % L): 6%
+        (C % S): 9%
+        (C + M % L): 12%

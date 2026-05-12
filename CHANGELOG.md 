@@ -1,0 +1,20 @@
+## [1.2.0] - 2026-05-08
+### Додано
+- Unit та integration тести (22 тести, coverage 59%)
+- Dockerfile та docker-compose.yml
+- GitHub Actions CI/CD пайплайн
+- Декоратори @timer @log_call @retry
+- BackgroundTasks для Telegram-сповіщень
+
+## [1.1.0] - 2026-05-07
+### Додано
+- Патерни: Singleton Factory Builder Observer Strategy Facade
+- Обробка помилок та логування
+- Async/await для всіх DB-запитів
+
+## [1.0.0] - 2026-04-10
+### Додано
+- Layered Architecture (repositories/services/api)
+- REST API з OpenAPI 3.0 специфікацією
+- Supabase схема (7 таблиць, RLS, Foreign Keys)
+- Telegram WebApp авторизація
