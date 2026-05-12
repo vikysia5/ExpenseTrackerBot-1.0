@@ -25,11 +25,11 @@ jobs:
 
       - name: Run tests
         env:
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_KEY: fake-supabase-anon-key
-          SUPABASE_SERVICE_KEY: fake-supabase-service-key
-          JWT_SECRET: test-jwt-secret-for-ci-only
-          TELEGRAM_BOT_TOKEN: fake-telegram-token
+         SUPABASE_URL: https://test.supabase.co
+         SUPABASE_KEY: fake.fake.fake
+         SUPABASE_SERVICE_KEY: fake.fake.fake
+         JWT_SECRET: test-jwt-secret-for-ci-only
+         TELEGRAM_BOT_TOKEN: fake-telegram-token
         run: |
           cd backend
           pytest --cov=src --cov-fail-under=50 -v
@@ -47,8 +47,8 @@ jobs:
         run: |
           docker run -d --name test-ct -p 8000:8000 \
             -e SUPABASE_URL=https://test.supabase.co \
-            -e SUPABASE_KEY=fake-supabase-anon-key \
-            -e SUPABASE_SERVICE_KEY=fake-supabase-service-key \
+            -e SUPABASE_KEY=fake.fake.fake \
+            -e SUPABASE_SERVICE_KEY=fake.fake.fake \
             -e JWT_SECRET=test-jwt-secret \
             -e TELEGRAM_BOT_TOKEN=fake-telegram-token \
             expense-tracker:test
