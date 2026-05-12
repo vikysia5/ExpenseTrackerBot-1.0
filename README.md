@@ -174,10 +174,10 @@ expense-tracker/
 
 ```
 users ─────────────────────────────────────┐
-  ├── transactions (1:N)                    │
-  │     └── expense_tags (M:N) ── tags      │
-  ├── categories (1:N)                      │
-  ├── budgets (1:N)                         │
+  ├── transactions (1:N)                   │
+  │     └── expense_tags (M:N) ── tags     │
+  ├── categories (1:N)                     │
+  ├── budgets (1:N)                        │
   └── user_settings (1:1)                  │
 ```
 
