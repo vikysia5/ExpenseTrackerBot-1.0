@@ -1,39 +1,56 @@
 name: CI
+
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
+
       - name: Install dependencies
         run: |
           cd backend
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-asyncio
+
       - name: Run tests
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_KEY: test-key
+          SUPABASE_SERVICE_KEY: test-service-key
+          JWT_SECRET: test-jwt-secret
+          TELEGRAM_BOT_TOKEN: test-token
         run: |
           cd backend
           pytest --cov=src --cov-fail-under=70 -v
+
   docker:
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
+
       - name: Build Docker image
         run: docker build -t expense-tracker:test ./backend
+
       - name: Test container starts
         run: |
           docker run -d --name test-ct -p 8000:8000 \
-            -e SUPABASE_URL=test -e SUPABASE_KEY=test \
-            -e SUPABASE_SERVICE_KEY=test \
-            -e JWT_SECRET=test expense-tracker:test
+            -e SUPABASE_URL=https://test.supabase.co \
+            -e SUPABASE_KEY=test-key \
+            -e SUPABASE_SERVICE_KEY=test-service-key \
+            -e JWT_SECRET=test-jwt-secret \
+            -e TELEGRAM_BOT_TOKEN=test-token \
+            expense-tracker:test
           sleep 5
           docker stop test-ct
